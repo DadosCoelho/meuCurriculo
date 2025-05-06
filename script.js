@@ -1,12 +1,35 @@
+// Função para carregar e parsear o .env
+async function loadEnvConfig() {
+    try {
+        const response = await fetch('/.env');
+        if (!response.ok) {
+            throw new Error('Não foi possível carregar o arquivo .env');
+        }
+        const text = await response.text();
+        const config = {};
+        text.split('\n').forEach(line => {
+            line = line.trim();
+            if (line && !line.startsWith('#')) {
+                const [key, value] = line.split('=').map(part => part.trim());
+                if (key && value) {
+                    config[key] = value;
+                }
+            }
+        });
+        return config;
+    } catch (error) {
+        console.error('Erro ao carregar .env:', error);
+        showErrorMessage('objetivos', 'Não foi possível carregar as configurações.');
+        return {};
+    }
+}
+
 // Constantes de configuração locais
 const LOCAL_CONFIG = {
     featuredProjectCount: 3,
     animationDelay: 100,
     cacheTTL: 1000 * 60 * 60, // Cache de 1 hora
 };
-
-// Combinar configurações de config.js com configurações locais
-const APP_CONFIG = { ...window.CONFIG, ...LOCAL_CONFIG };
 
 // Cache de dados
 let cachedData = {
@@ -23,38 +46,45 @@ const uiState = {
 
 // Função principal que inicializa tudo
 document.addEventListener('DOMContentLoaded', async () => {
+    // Carregar configurações do .env
+    const envConfig = await loadEnvConfig();
+    const APP_CONFIG = { ...envConfig, ...LOCAL_CONFIG };
+
+    // Atualizar imagens de perfil
+    updateProfileImages(APP_CONFIG.PROFILE_IMAGE_URL || 'https://avatars.githubusercontent.com/u/165790519?v=4');
+
     setupThemeDetection();
     setupIntersectionObserver();
     setupScrollHandler();
     setupProfileImageClick();
     initializeProfileImage();
     setupSavePDFButton();
-    
+
     try {
         // Verificar cache local
         const cachedCurriculo = loadFromLocalStorage('curriculoInfo');
         const cachedProjects = loadFromLocalStorage('githubProjects');
-        
+
         if (cachedCurriculo) {
             cachedData.curriculoInfo = cachedCurriculo;
             uiState.curriculoLoaded = true;
             updateCurriculoUI(cachedCurriculo);
         }
-        
+
         if (cachedProjects) {
             cachedData.githubProjects = cachedProjects;
             uiState.projectsLoaded = true;
             renderFeaturedProjects(cachedProjects);
             renderScrollingProjects(cachedProjects);
         }
-        
+
         // Carregar dados em paralelo
         const curriculoPromise = cachedCurriculo ? Promise.resolve(cachedCurriculo) : fetchGistData();
         const githubPromise = cachedProjects ? Promise.resolve(cachedProjects) : fetchGitHubProjects();
-        
+
         // Aguardar o carregamento dos dados do currículo
         await curriculoPromise;
-        
+
         // Esperar os projetos carregarem
         githubPromise.catch(error => {
             console.error('Erro ao carregar projetos:', error);
@@ -63,7 +93,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Erro ao inicializar a página:', error);
     }
+
+    // Funções que dependem de APP_CONFIG
+    async function fetchGistData() {
+        try {
+            const response = await fetch(`https://api.github.com/gists/${APP_CONFIG.GIST_ID}`, {
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const gist = await response.json();
+            if (!gist.files['curriculo.json']) {
+                throw new Error('Arquivo curriculo.json não encontrado no Gist');
+            }
+
+            const data = JSON.parse(gist.files['curriculo.json'].content);
+            cachedData.curriculoInfo = data;
+            uiState.curriculoLoaded = true;
+            saveToLocalStorage('curriculoInfo', data);
+            updateCurriculoUI(data);
+
+            return data;
+        } catch (error) {
+            console.error('Erro ao carregar Gist:', error);
+            showErrorMessage('objetivos', 'Não foi possível carregar as informações do currículo.');
+            throw error;
+        }
+    }
+
+    async function fetchGitHubProjects() {
+        try {
+            const response = await fetch(`https://api.github.com/users/${APP_CONFIG.GITHUB_USERNAME}/repos?sort=created&direction=desc&per_page=100`, {
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const repos = await response.json();
+            cachedData.githubProjects = repos;
+            uiState.projectsLoaded = true;
+            saveToLocalStorage('githubProjects', repos);
+            renderFeaturedProjects(repos);
+            renderScrollingProjects(repos);
+
+            return repos;
+        } catch (error) {
+            console.error('Erro ao carregar repositórios:', error);
+            showErrorMessage('projetos', 'Não foi possível carregar os projetos do GitHub.');
+            throw error;
+        }
+    }
 });
+
+// Atualizar imagens de perfil
+function updateProfileImages(url) {
+    const profileImage = document.querySelector('.profile-image');
+    const fixedProfileImage = document.querySelector('.fixed-profile-image');
+    if (profileImage) profileImage.src = url;
+    if (fixedProfileImage) fixedProfileImage.src = url;
+}
 
 // Configurar botão de salvar PDF
 function setupSavePDFButton() {
@@ -72,26 +169,26 @@ function setupSavePDFButton() {
         saveButton.addEventListener('click', () => {
             const element = document.querySelector('.container');
             const opt = {
-                margin: [0.5, 0.5, 0.5, 0.5], // Margens uniformes (top, right, bottom, left)
+                margin: [0.5, 0.5, 0.5, 0.5],
                 filename: 'curriculo_reinaldo_coelho.pdf',
-                image: { type: 'jpeg', quality: 0.95 }, // Reduzir qualidade para evitar arquivos grandes
+                image: { type: 'jpeg', quality: 0.95 },
                 html2canvas: {
-                    scale: 2, // Escala para boa qualidade
-                    useCORS: true, // Habilitar CORS para imagens externas
-                    windowWidth: element.scrollWidth, // Usar largura real do conteúdo
+                    scale: 2,
+                    useCORS: true,
+                    windowWidth: element.scrollWidth,
                     scrollX: 0,
                     scrollY: 0
                 },
                 jsPDF: {
                     unit: 'in',
-                    format: 'a4', // Usar A4 para consistência
+                    format: 'a4',
                     orientation: 'portrait',
-                    putOnlyUsedFonts: true, // Reduzir tamanho do PDF
+                    putOnlyUsedFonts: true,
                     floatPrecision: 16
                 },
                 pagebreak: {
-                    mode: ['css', 'legacy'], // Respeitar quebras de página definidas no CSS
-                    avoid: ['.section', '.project-card', '.timeline-item'] // Evitar quebrar seções
+                    mode: ['css', 'legacy'],
+                    avoid: ['.section', '.project-card', '.timeline-item']
                 }
             };
             html2pdf().set(opt).from(element).save();
@@ -104,15 +201,14 @@ function setupScrollHandler() {
     const fixedHeader = document.querySelector('.fixed-header');
     const header = document.querySelector('header');
     const placeholder = document.querySelector('.header-placeholder');
-    
+
     window.addEventListener('scroll', () => {
         const headerBottom = header.getBoundingClientRect().bottom;
         const headerStyles = window.getComputedStyle(header);
-        // Calcula a altura total incluindo margens
-        const headerHeight = header.offsetHeight + 
-                            parseFloat(headerStyles.marginTop) + 
+        const headerHeight = header.offsetHeight +
+                            parseFloat(headerStyles.marginTop) +
                             parseFloat(headerStyles.marginBottom);
-        
+
         if (headerBottom <= 0) {
             fixedHeader.classList.add('visible');
             placeholder.style.height = `${headerHeight}px`;
@@ -127,18 +223,18 @@ function setupScrollHandler() {
 function setupProfileImageClick() {
     const profileImage = document.querySelector('.profile-image');
     const fixedProfileImage = document.querySelector('.fixed-profile-image');
-    
+
     const scrollToTop = () => {
         window.scrollTo({
             top: 0,
             behavior: 'smooth'
         });
     };
-    
+
     if (profileImage) {
         profileImage.addEventListener('click', scrollToTop);
     }
-    
+
     if (fixedProfileImage) {
         fixedProfileImage.addEventListener('click', scrollToTop);
     }
@@ -154,7 +250,7 @@ function setupIntersectionObserver() {
             }
         });
     }, { threshold: 0.15 });
-    
+
     document.querySelectorAll('.section').forEach(section => {
         uiState.intersectionObserver.observe(section);
     });
@@ -175,7 +271,7 @@ function setupThemeDetection() {
     if (prefersDarkMode) {
         document.body.classList.add('dark-mode');
     }
-    
+
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
         document.body.classList.toggle('dark-mode', event.matches);
     });
@@ -209,7 +305,7 @@ function formatRelativeDate(dateString) {
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 1) return 'hoje';
     if (diffDays === 1) return 'ontem';
     if (diffDays < 7) return `há ${diffDays} dias`;
@@ -231,7 +327,7 @@ function loadFromLocalStorage(key) {
         const data = localStorage.getItem(key);
         if (!data) return null;
         const { value, timestamp } = JSON.parse(data);
-        if (Date.now() - timestamp > APP_CONFIG.cacheTTL) {
+        if (Date.now() - timestamp > LOCAL_CONFIG.cacheTTL) {
             localStorage.removeItem(key);
             return null;
         }
@@ -254,55 +350,23 @@ function saveToLocalStorage(key, value) {
     }
 }
 
-// Buscar Gist
-async function fetchGistData() {
-    try {
-        const response = await fetch(`https://api.github.com/gists/${APP_CONFIG.gistId}`, {
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-            },
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const gist = await response.json();
-        if (!gist.files['curriculo.json']) {
-            throw new Error('Arquivo curriculo.json não encontrado no Gist');
-        }
-        
-        const data = JSON.parse(gist.files['curriculo.json'].content);
-        cachedData.curriculoInfo = data;
-        uiState.curriculoLoaded = true;
-        saveToLocalStorage('curriculoInfo', data);
-        updateCurriculoUI(data);
-        
-        return data;
-    } catch (error) {
-        console.error('Erro ao carregar Gist:', error);
-        showErrorMessage('objetivos', 'Não foi possível carregar as informações do currículo.');
-        throw error;
-    }
-}
-
 // Atualizar interface do currículo
 function updateCurriculoUI(data) {
     const updateText = (id, text) => {
         const element = document.getElementById(id);
         if (element) element.textContent = text;
     };
-    
+
     const updateHTML = (id, html) => {
         const element = document.getElementById(id);
         if (element) element.innerHTML = html;
     };
-    
+
     document.title = `Currículo - ${data.nome}`;
     updateText('nome-header', data.nome);
     updateText('fixed-nome-header', data.nome);
     updateText('nome-footer', data.nome);
-    
+
     const nameParts = data.nome.split(' ');
     let initials = nameParts[0][0];
     if (nameParts.length > 1) {
@@ -310,13 +374,13 @@ function updateCurriculoUI(data) {
     }
     const profileImage = document.getElementById('profileImage');
     if (profileImage) profileImage.setAttribute('data-initials', initials.toUpperCase());
-    
+
     updateHTML('email', `<a href="mailto:${data.contato.email}">${data.contato.email}</a>`);
     updateHTML('github', `<a href="${data.contato.github}" target="_blank">${data.contato.github.split('/').pop()}</a>`);
     updateHTML('telefone', `<a href="tel:${data.contato.telefone.replace(/\D/g, '')}">${data.contato.telefone}</a>`);
-    
+
     updateText('objetivos-text', data.objetivos);
-    
+
     const formacaoList = document.getElementById('formacao-list');
     if (formacaoList) {
         formacaoList.innerHTML = '';
@@ -332,10 +396,10 @@ function updateCurriculoUI(data) {
                     <p class="timeline-subtitle">${item.instituicao}</p>
                 `;
                 formacaoList.appendChild(element);
-            }, index * APP_CONFIG.animationDelay);
+            }, index * LOCAL_CONFIG.animationDelay);
         });
     }
-    
+
     const experienciasList = document.getElementById('experiencias-list');
     if (experienciasList) {
         experienciasList.innerHTML = '';
@@ -352,7 +416,7 @@ function updateCurriculoUI(data) {
                     <div class="timeline-content">${item.descricao}</div>
                 `;
                 experienciasList.appendChild(element);
-            }, index * APP_CONFIG.animationDelay);
+            }, index * LOCAL_CONFIG.animationDelay);
         });
     }
 }
@@ -379,57 +443,28 @@ function getLanguageColor(language) {
     return colorMap[language] || '#6b7280';
 }
 
-// Buscar projetos do GitHub
-async function fetchGitHubProjects() {
-    try {
-        const response = await fetch(`https://api.github.com/users/${APP_CONFIG.githubUsername}/repos?sort=created&direction=desc&per_page=100`, {
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-            },
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const repos = await response.json();
-        cachedData.githubProjects = repos;
-        uiState.projectsLoaded = true;
-        saveToLocalStorage('githubProjects', repos);
-        renderFeaturedProjects(repos);
-        renderScrollingProjects(repos);
-        
-        return repos;
-    } catch (error) {
-        console.error('Erro ao carregar repositórios:', error);
-        showErrorMessage('projetos', 'Não foi possível carregar os projetos do GitHub.');
-        throw error;
-    }
-}
-
 // Renderizar projetos em destaque
 function renderFeaturedProjects(repos) {
     const featuredContainer = document.getElementById('featured-projects');
     if (!featuredContainer) return;
-    
+
     featuredContainer.innerHTML = '';
-    
-    const featuredRepos = repos.slice(0, APP_CONFIG.featuredProjectCount);
-    
+
+    const featuredRepos = repos.slice(0, LOCAL_CONFIG.featuredProjectCount);
+
     featuredRepos.forEach((repo, index) => {
         setTimeout(() => {
             const card = document.createElement('div');
             card.className = 'project-card';
-            
+
             const description = repo.description || 'Sem descrição disponível';
             const language = repo.language || 'Desconhecido';
             const languageColor = getLanguageColor(language);
-            // Verificar se há homepage e decidir se o nome será clicável
             const hasHomepage = repo.homepage && repo.homepage !== '';
             const projectNameHTML = hasHomepage
                 ? `<a href="${repo.homepage}" target="_blank">${repo.name} <span class="link-icon">🔗</span></a>`
                 : `${repo.name}`;
-            
+
             card.innerHTML = `
                 <div class="card-inner">
                     <div class="card-header">
@@ -456,7 +491,7 @@ function renderFeaturedProjects(repos) {
                 </div>
             `;
             featuredContainer.appendChild(card);
-        }, index * APP_CONFIG.animationDelay);
+        }, index * LOCAL_CONFIG.animationDelay);
     });
 }
 
@@ -467,12 +502,10 @@ function renderScrollingProjects(repos) {
 
     projectTrack.innerHTML = '';
 
-    // Filtrar repositórios, excluindo os primeiros 'featuredProjectCount'
-    const scrollingRepos = repos.slice(APP_CONFIG.featuredProjectCount);
+    const scrollingRepos = repos.slice(LOCAL_CONFIG.featuredProjectCount);
 
-    // Ajustar número de duplicações com base na largura da tela
-    const cardWidth = 320; // Largura mínima do card em pixels
-    const minVisibleCards = Math.ceil(window.innerWidth / cardWidth) + 2; // Cards visíveis + margem
+    const cardWidth = 320;
+    const minVisibleCards = Math.ceil(window.innerWidth / cardWidth) + 2;
     const duplicates = Math.max(2, Math.ceil(minVisibleCards / scrollingRepos.length));
 
     for (let i = 0; i < duplicates; i++) {
@@ -483,7 +516,6 @@ function renderScrollingProjects(repos) {
             const description = repo.description || 'Sem descrição';
             const language = repo.language || 'Desconhecido';
             const languageColor = getLanguageColor(language);
-            // Verificar se há homepage e decidir se o nome será clicável
             const hasHomepage = repo.homepage && repo.homepage !== '';
             const projectNameHTML = hasHomepage
                 ? `<a href="${repo.homepage}" target="_blank">${repo.name} <span class="link-icon">🔗</span></a>`

@@ -17,21 +17,21 @@ Este é um projeto de currículo web dinâmico que exibe informações pessoais,
 ├── index.html        # Página principal do currículo
 ├── styles.css        # Estilos da interface
 ├── script.js         # Lógica principal (carregamento de dados, renderização)
-├── config.js         # Configurações sensíveis (gistId, githubUsername)
+├── .env              # Configurações sensíveis (GIST_ID, GITHUB_USERNAME, PROFILE_IMAGE_URL)
 └── .gitignore        # Ignora arquivos sensíveis e temporários
 ```
 
 ### Arquivos Principais
 
-- **`index.html`**: Contém a estrutura HTML do currículo, incluindo referências a `config.js` e `script.js`.
+- **`index.html`**: Contém a estrutura HTML do currículo, incluindo referência a `script.js`.
 - **`styles.css`**: Define o layout, temas e animações.
 - **`script.js`**: Gerencia o carregamento de dados do Gist e repositórios, renderização de projetos, e funcionalidades como salvar PDF.
-- **`config.js`**: Armazena chaves sensíveis (`gistId` e `githubUsername`). **Não versionado** (ignorado pelo `.gitignore`).
-- **`.gitignore`**: Protege `config.js` e outros arquivos sensíveis (ex.: `node_modules`, `.env`).
+- **`.env`**: Armazena chaves sensíveis (`GIST_ID`, `GITHUB_USERNAME`, `PROFILE_IMAGE_URL`). **Não versionado** (ignorado pelo `.gitignore`).
+- **`.gitignore`**: Protege `.env` e outros arquivos sensíveis (ex.: `node_modules`, `config.js`).
 
 ## Estrutura do Gist
 
-O currículo carrega dados de um arquivo `curriculo.json` hospedado em um Gist do GitHub, identificado pelo `gistId` em `config.js`. O arquivo JSON deve seguir a estrutura abaixo:
+O currículo carrega dados de um arquivo `curriculo.json` hospedado em um Gist do GitHub, identificado pelo `GIST_ID` em `.env`. O arquivo JSON deve seguir a estrutura abaixo:
 
 ```json
 {
@@ -86,7 +86,7 @@ O currículo carrega dados de um arquivo `curriculo.json` hospedado em um Gist d
 2. Crie um novo Gist com um arquivo chamado `curriculo.json`.
 3. Cole o JSON com a estrutura acima, preenchendo com seus dados.
 4. Torne o Gist público (ou secreto, se preferir, mas garanta que a API possa acessá-lo).
-5. Copie o ID do Gist (ex.: `1848e354f2c127682042a4ec9b611b5b`) e adicione-o ao `config.js`.
+5. Copie o ID do Gist (ex.: `1848e354f2c127682042a4ec9b611b5b`) e adicione-o ao `.env`.
 
 ## Configuração
 
@@ -95,36 +95,54 @@ O currículo carrega dados de um arquivo `curriculo.json` hospedado em um Gist d
 - Navegador moderno (Chrome, Firefox, Safari, etc.).
 - Conexão com a internet para carregar dados da API do GitHub.
 - Servidor local (recomendado) para evitar problemas de CORS ao testar localmente (ex.: `npx http-server`).
+- Configuração do servidor para bloquear acesso direto ao `.env` (ex.: Nginx, Apache).
 
 ### Passos para Executar
 
 1. **Clone o Repositório**:
    ```bash
-   git clone https://github.com/DadosCoelho/seu-repositorio.git
-   cd seu-repositorio
+   git clone https://github.com/DadosCoelho/meuCurriculo.git
+   cd meuCurriculo
    ```
 
-2. **Crie o Arquivo `config.js`**:
-   - Crie um arquivo `config.js` na raiz do projeto com o seguinte conteúdo:
-     ```javascript
-     window.CONFIG = {
-         gistId: 'SEU_GIST_ID',
-         githubUsername: 'SEU_GITHUB_USERNAME'
-     };
+2. **Crie o Arquivo `.env`**:
+   - Crie um arquivo `.env` na raiz do projeto com o seguinte conteúdo:
+     ```plaintext
+     GIST_ID=SEU_GIST_ID
+     GITHUB_USERNAME=SEU_GITHUB_USERNAME
+     PROFILE_IMAGE_URL=URL_DA_SUA_IMAGEM
      ```
    - Substitua `SEU_GIST_ID` pelo ID do Gist que contém o arquivo `curriculo.json`.
    - Substitua `SEU_GITHUB_USERNAME` pelo seu nome de usuário do GitHub.
+   - Substitua `URL_DA_SUA_IMAGEM` pelo link da sua imagem de perfil (ex.: `https://avatars.githubusercontent.com/u/165790519?v=4`).
    - **Nota**: Este arquivo é ignorado pelo `.gitignore` para proteger suas chaves.
 
-3. **Verifique o `index.html`**:
-   - Certifique-se de que `index.html` inclui os scripts na ordem correta:
+3. **Configure o Servidor para Proteger o `.env`**:
+   - Para evitar que o `.env` seja acessível publicamente, configure seu servidor:
+     - **Nginx**:
+       ```nginx
+       location ~* \.env$ {
+           deny all;
+           return 403;
+       }
+       ```
+     - **Apache**:
+       ```apache
+       <Files ".env">
+           Order allow,deny
+           Deny from all
+       </Files>
+       ```
+   - Alternativamente, use um proxy ou backend para fornecer as variáveis de configuração de forma segura.
+
+4. **Verifique o `index.html`**:
+   - Certifique-se de que `index.html` inclui apenas o script necessário:
      ```html
-     <script src="config.js"></script>
      <script src="script.js"></script>
      ```
-   - Os scripts devem estar no `<head>` ou no final do `<body>`.
+   - O script `script.js` carrega as configurações do `.env`.
 
-4. **Execute o Projeto**:
+5. **Execute o Projeto**:
    - Inicie um servidor local:
      ```bash
      npx http-server
@@ -132,15 +150,17 @@ O currículo carrega dados de um arquivo `curriculo.json` hospedado em um Gist d
    - Acesse `http://localhost:8080` no navegador.
    - Alternativamente, abra `index.html` diretamente, mas isso pode causar problemas de CORS.
 
-5. **Teste as Funcionalidades**:
+6. **Teste as Funcionalidades**:
    - Verifique se os dados do Gist e repositórios são carregados.
+   - Confirme que a imagem de perfil usa o `PROFILE_IMAGE_URL` do `.env`.
    - Teste o botão de salvar PDF.
    - Confirme que os links de projetos com `homepage` mostram o ícone de corrente (`🔗`).
 
 ## Segurança
 
-- **Chaves Sensíveis**: O `gistId` e `githubUsername` são armazenados em `config.js`, que é ignorado pelo `.gitignore` para evitar exposição no repositório Git.
-- **Limitações**: Como o projeto é estático, `config.js` é acessível no navegador em um site público. Para maior segurança, considere:
+- **Chaves Sensíveis**: O `GIST_ID`, `GITHUB_USERNAME` e `PROFILE_IMAGE_URL` são armazenados em `.env`, que é ignorado pelo `.gitignore` para evitar exposição no repositório Git.
+- **Limitações**: Como o projeto é estático, o `.env` precisa ser acessível via `fetch('/.env')`, o que pode expô-lo em servidores públicos. Para maior segurança, considere:
+  - Configurar o servidor para bloquear acesso direto ao `.env` (veja acima).
   - Usar um token de acesso pessoal do GitHub com permissões restritas.
   - Configurar um backend ou proxy para chamadas à API.
   - Hospedar o Gist em um repositório privado.
@@ -151,6 +171,7 @@ O currículo carrega dados de um arquivo `curriculo.json` hospedado em um Gist d
 - **Estilização**: Edite `styles.css` para ajustar cores, fontes ou animações.
 - **Configurações**: Modifique `script.js` para alterar o número de projetos em destaque (`featuredProjectCount`) ou o atraso das animações (`animationDelay`).
 - **Dados do Currículo**: Atualize o arquivo `curriculo.json` no Gist para refletir suas informações pessoais, formação e experiências.
+- **Imagem de Perfil**: Atualize o `PROFILE_IMAGE_URL` no `.env` para mudar a imagem de perfil.
 
 ## Dependências
 
