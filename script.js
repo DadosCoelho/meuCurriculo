@@ -6,7 +6,14 @@ const LOCAL_CONFIG = {
 };
 
 // Combinar configurações do config.js com locais
-const APP_CONFIG = { ...window.CONFIG, ...LOCAL_CONFIG };
+const APP_CONFIG = {
+    GIST_ID: '1848e354f2c127682042a4ec9b611b5b',
+    GITHUB_USERNAME: 'DadosCoelho',
+    PROFILE_IMAGE_URL: 'https://avatars.githubusercontent.com/u/165790519?v=4',
+    featuredProjectCount: 3,
+    animationDelay: 100,
+    cacheTTL: 1000 * 60 * 60
+};
 
 // Cache de dados
 let cachedData = {

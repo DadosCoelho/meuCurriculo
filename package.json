@@ -1,8 +1,0 @@
-{
-         "name": "curriculo-dinamico",
-         "version": "1.0.0",
-         "scripts": {
-             "build": "node generate-config.js"
-         },
-         "dependencies": {}
-     }

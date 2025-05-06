@@ -1,34 +1,35 @@
- config.js
- *.key
- *.pem
- *.env
+# Arquivos de configuração sensíveis
+   *.key
+   *.pem
+   *.env
 
- # Dependências e builds
- node_modules/
- dist/
- build/
- *.lock
+# Dependências e builds
+   node_modules/
+   dist/
+   build/
+   public/
+   *.lock
 
- # Arquivos de cache e temporários
- *.cache
- *.log
- *.tmp
- *.bak
- *.swp
+# Arquivos de cache e temporários
+   *.cache
+   *.log
+   *.tmp
+   *.bak
+   *.swp
 
- # Arquivos do sistema
- .DS_Store
- Thumbs.db
- .vscode/
- .idea/
+# Arquivos do sistema
+   .DS_Store
+   Thumbs.db
+   .vscode/
+   .idea/
 
- # Arquivos de dados sensíveis
- *.json.bak
- *.csv
- *.sql
- *.sqlite
+# Arquivos de dados sensíveis
+   *.json.bak
+   *.csv
+   *.sql
+   *.sqlite
 
- # Outros
- *.zip
- *.tar.gz
- *.rar
+# Outros
+   *.zip
+   *.tar.gz
+   *.rar
