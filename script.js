@@ -1,35 +1,12 @@
-// Função para carregar e parsear o .env
-async function loadEnvConfig() {
-    try {
-        const response = await fetch('/.env');
-        if (!response.ok) {
-            throw new Error('Não foi possível carregar o arquivo .env');
-        }
-        const text = await response.text();
-        const config = {};
-        text.split('\n').forEach(line => {
-            line = line.trim();
-            if (line && !line.startsWith('#')) {
-                const [key, value] = line.split('=').map(part => part.trim());
-                if (key && value) {
-                    config[key] = value;
-                }
-            }
-        });
-        return config;
-    } catch (error) {
-        console.error('Erro ao carregar .env:', error);
-        showErrorMessage('objetivos', 'Não foi possível carregar as configurações.');
-        return {};
-    }
-}
-
 // Constantes de configuração locais
 const LOCAL_CONFIG = {
     featuredProjectCount: 3,
     animationDelay: 100,
     cacheTTL: 1000 * 60 * 60, // Cache de 1 hora
 };
+
+// Combinar configurações do config.js com locais
+const APP_CONFIG = { ...window.CONFIG, ...LOCAL_CONFIG };
 
 // Cache de dados
 let cachedData = {
@@ -46,12 +23,8 @@ const uiState = {
 
 // Função principal que inicializa tudo
 document.addEventListener('DOMContentLoaded', async () => {
-    // Carregar configurações do .env
-    const envConfig = await loadEnvConfig();
-    const APP_CONFIG = { ...envConfig, ...LOCAL_CONFIG };
-
     // Atualizar imagens de perfil
-    updateProfileImages(APP_CONFIG.PROFILE_IMAGE_URL || 'https://avatars.githubusercontent.com/u/165790519?v=4');
+    updateProfileImages(APP_CONFIG.PROFILE_IMAGE_URL);
 
     setupThemeDetection();
     setupIntersectionObserver();
